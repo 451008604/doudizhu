@@ -213,6 +213,7 @@
       el: "#app",
       data: function () {
         return {
+          durationTime: 0,
           msgBox: [
             '你的牌打得太好了',
             '快点吧，我等到花儿也谢了！',
@@ -243,7 +244,6 @@
             },
             ctxScore: [],
             timeout: 15,
-
           },
           //座位状态
           posState: {
@@ -295,7 +295,6 @@
           this.client.on('MESSAGE', function (data) {
             layer.msg(data.msg);
           }.bind(this));
-
 
           this.client.on('LOGIN_SUCCESS', function (data) {
             this.desks = data;
@@ -407,8 +406,8 @@
             this.posState.right.ctxCards = [];
             this.posState.self.ctxCards = [];
 
+            this.durationTime = Math.floor(new Date().getTime() / 1000);
           }.bind(this));
-
 
           //叫分事件
           this.client.on('CTX_USER_CHANGE', function (data) {
@@ -472,7 +471,25 @@
             data.winner.forEach(function (id) {
               var direct = this.getDirectionByPosId(id);
               content += '<div>' + this.posState[direct].name + '：+' + (score / data.winner.length) + '分</div>';
+
+              // 胜利后上报战绩
+              var postMyData = {
+                "customer_id": "" + this.posState[direct].name,
+                "chess_card": "puke_dou_di_zhu",
+                "duration_time": "" + (Math.floor(new Date().getTime() / 1000) - this.durationTime),
+                "rival_customer_ids": "",
+                "partner_customer_ids": "",
+                "current_score": 1,
+                "game_result": "victory",
+                "other_attr": {},
+                "game_count": "2"
+              };
+              let xhr = new XMLHttpRequest();
+              xhr.open("POST", "https://bpbsn.ycan.cn/api/v1/weixin/saveChessCardResult", true);
+              xhr.setRequestHeader('Conten-Type', 'application/json');
+              xhr.send(JSON.stringify(postMyData));
             }.bind(this));
+
             data.loser.forEach(function (id) {
               var direct = this.getDirectionByPosId(id);
               content += '<div>' + this.posState[direct].name + '：-' + (score / data.loser.length) + '分</div>';
@@ -483,7 +500,6 @@
               title: '本局结果',
               content: content
             });
-
 
             // layer.alert(msg, {
             //   icon: icon,
@@ -504,7 +520,6 @@
             this.posState.self.isPass = false;
 
           }.bind(this));
-
 
           this.client.on('USER_MESSAGE', function (data) {
             var direct = this.getDirectionByPosId(data.posId);
