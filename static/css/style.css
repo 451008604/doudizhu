@@ -245,7 +245,6 @@
      background-position: -180px -480px;
  }
 
-
  .full-screen {
      position: fixed;
      top: 0;
@@ -258,6 +257,7 @@
 
  .house {
      background-image: url("../images/join_bk.png");
+     background-repeat: round;
      padding-top: 40px;
  }
 
@@ -343,6 +343,7 @@
 
  .room {
      background-image: url("../images/table_bg_2.jpg");
+     background-repeat: round;
  }
 
  .btn-exit-room {

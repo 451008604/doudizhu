@@ -544,24 +544,28 @@
           const query = new URLSearchParams(window.location.search);
           // 获取 'username' 参数
           const username = query.get('token');
-
-          let xhr = new XMLHttpRequest();
-          xhr.onreadystatechange = function () {
-            if (xhr.readyState == 4 && (xhr.status >= 200 && xhr.status < 400)) {
-              console.log(xhr.responseText);
-              this.posState.self.name = "" + username;
-              this.login();
-              let json = JSON.parse(xhr.responseText);
-              if (json.code != 200 || json.obj == null) {
-                return;
+          if (username) {
+            let xhr = new XMLHttpRequest();
+            xhr.onreadystatechange = function () {
+              if (xhr.readyState == 4 && (xhr.status >= 200 && xhr.status < 400)) {
+                console.log(xhr.responseText);
+                this.posState.self.name = "" + username;
+                this.login();
+                let json = JSON.parse(xhr.responseText);
+                if (json.code != 200 || json.obj == null) {
+                  return;
+                }
+                // DataManager.instance.user.token = "" + json.obj.id;
+                this.posState.self.name = "" + json.obj.id;
+                this.login();
               }
-              // DataManager.instance.user.token = "" + json.obj.id;
-              this.posState.self.name = "" + json.obj.id;
-              this.login();
-            }
-          }.bind(this);
-          xhr.open("GET", "https://bpbsn.ycan.cn/api/v1/weixin/customerByToken/" + username, true);
-          xhr.send();
+            }.bind(this);
+            xhr.open("GET", "https://bpbsn.ycan.cn/api/v1/weixin/customerByToken/" + username, true);
+            xhr.send();
+          } else {
+            this.posState.self.name = "" + new Date().getTime();
+            this.login();
+          }
         },
         login: function () {
           if (!this.posState.self.name) {
