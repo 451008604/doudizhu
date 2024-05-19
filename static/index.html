@@ -550,9 +550,9 @@
               if (xhr.readyState == 4 && (xhr.status >= 200 && xhr.status < 400)) {
                 console.log(xhr.responseText);
                 this.posState.self.name = "" + username;
-                this.login();
                 let json = JSON.parse(xhr.responseText);
                 if (json.code != 200 || json.obj == null) {
+                  this.login();
                   return;
                 }
                 // DataManager.instance.user.token = "" + json.obj.id;
@@ -576,6 +576,8 @@
           }
           layer.load({ type: 3 });
           this.client.emit('LOGIN', this.posState.self.name);
+
+          this.quickJoin();
         },
         getDesk: function (deskId) {
           for (var i = 0, len = this.desks.length; i < len; i++) {
@@ -699,6 +701,9 @@
         exitRoom: function () {
           this.client.emit('UNSITDOWN');
           layer.load({ type: 3 });
+
+          // 通知上层html关闭此iframe
+          parent.postMessage('exitRoom', "http://localhost:7456");
         },
         resetRoomStatus: function () {
           this.where = 1;
