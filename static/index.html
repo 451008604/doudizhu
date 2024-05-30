@@ -257,7 +257,8 @@
               isPass: false,
               isDizhu: false,
               callScore: -1,
-              name: '游客'
+              name: '游客',
+              token: ""
             },
             right: {
               state: 0,//0没人，1未准备 2准备
@@ -266,7 +267,8 @@
               isPass: false,
               isDizhu: false,
               callScore: -1,
-              name: '游客'
+              name: '游客',
+              token: ""
             },
             self: {
               state: 0,//0没人，1未准备 2准备
@@ -275,7 +277,8 @@
               isPass: false,
               isDizhu: false,
               callScore: -1,
-              name: ''
+              name: '',
+              token: ""
             }
           }
         };
@@ -309,7 +312,7 @@
 
           this.client.on('QUICK_JOIN', function (data) {
             if (data.success) {
-              this.client.emit('SITDOWN', { deskId: data.deskId, posId: data.posId });
+              this.client.emit('SITDOWN', { deskId: data.deskId, posId: data.posId, token: data.token });
             } else {
               layer.closeAll();
               layer.msg('快速加入失败');
@@ -322,7 +325,7 @@
             this.posId = data.posId;
             this.deskId = data.deskId;
             data.posInfos.forEach(function (pos) {
-              this.updatePosStatus(pos.posId, pos.state, pos.userName);
+              this.updatePosStatus(pos.posId, pos.state, pos.userName, pos.token);
             }.bind(this));
             this.posState.self.isDizhu = false;
             //this.msgList = [];
@@ -471,23 +474,6 @@
             data.winner.forEach(function (id) {
               var direct = this.getDirectionByPosId(id);
               content += '<div>' + this.posState[direct].name + '：+' + (score / data.winner.length) + '分</div>';
-
-              // 胜利后上报战绩
-              var postMyData = {
-                "customer_id": "" + this.posState[direct].name,
-                "chess_card": "puke_dou_di_zhu",
-                "duration_time": "" + (Math.floor(new Date().getTime() / 1000) - this.durationTime),
-                "rival_customer_ids": "",
-                "partner_customer_ids": "",
-                "current_score": 1,
-                "game_result": "victory",
-                "other_attr": {},
-                "game_count": "2"
-              };
-              let xhr = new XMLHttpRequest();
-              xhr.open("POST", "https://bpbsn.ycan.cn/api/v1/weixin/saveChessCardResult", true);
-              xhr.setRequestHeader('Conten-Type', 'application/json');
-              xhr.send(JSON.stringify(postMyData));
             }.bind(this));
 
             data.loser.forEach(function (id) {
@@ -519,6 +505,26 @@
             this.posState.self.callScore = -1;
             this.posState.self.isPass = false;
 
+
+            if (data.winner.indexOf(this.posId) > - 1) {
+              // 胜利后上报战绩
+              var postMyData = {
+                "customer_id": "" + this.posState.self.token,
+                "chess_card": "puke_dou_di_zhu",
+                "duration_time": "" + (Math.floor(new Date().getTime() / 1000) - this.durationTime),
+                "rival_customer_ids": "",
+                "partner_customer_ids": "",
+                "current_score": 1,
+                "game_result": "victory",
+                "other_attr": {},
+                "game_count": "2"
+              };
+              let xhr = new XMLHttpRequest();
+              xhr.open("POST", "https://bpbsn.ycan.cn/api/v1/weixin/saveChessCardResult", true);
+              xhr.setRequestHeader('Conten-Type', 'application/json');
+              xhr.send(JSON.stringify(postMyData));
+            }
+
           }.bind(this));
 
           this.client.on('USER_MESSAGE', function (data) {
@@ -542,42 +548,47 @@
         getUserToken: function () {
           // 创建一个 URLSearchParams 实例
           const query = new URLSearchParams(window.location.search);
-          // 获取 'username' 参数
-          const username = query.get('token');
-          if (username) {
+          // 获取 'token' 参数
+          const token = query.get('token');
+          console.log("token =>", token);
+          if (token) {
             let xhr = new XMLHttpRequest();
             xhr.onreadystatechange = function () {
               if (xhr.readyState == 4 && (xhr.status >= 200 && xhr.status < 400)) {
                 console.log(xhr.responseText);
-                this.posState.self.name = "" + username;
                 let json = JSON.parse(xhr.responseText);
                 if (json.code != 200 || json.obj == null) {
                   this.login();
                   return;
                 }
-                // DataManager.instance.user.token = "" + json.obj.id;
-                this.posState.self.name = "" + json.obj.id;
+                this.posState.self.token = "" + json.obj.id;
+                this.posState.self.name = "" + json.obj.name;
                 this.login();
               }
             }.bind(this);
-            xhr.open("GET", "https://bpbsn.ycan.cn/api/v1/weixin/customerByToken/" + username, true);
+            xhr.open("GET", "https://bpbsn.ycan.cn/api/v1/weixin/customerByToken/" + token, true);
             xhr.send();
           } else {
-            this.posState.self.name = "" + new Date().getTime();
             this.login();
           }
         },
         login: function () {
+          if (this.posState.self.name == "") {
+            this.posState.self.name = "" + new Date().getTime();
+          }
+          if (this.posState.self.token == "") {
+            this.posState.self.token = "" + new Date().getTime();
+          }
           if (!this.posState.self.name) {
             return layer.msg('请输入名字');
           }
-          if (this.posState.self.name.length > 18) {
-            return layer.msg('名字不超过18个字');
+          if (this.posState.self.name.length > 50) {
+            return layer.msg('名字不超过50个字');
           }
           layer.load({ type: 3 });
-          this.client.emit('LOGIN', this.posState.self.name);
+          this.client.emit('LOGIN', { userName: this.posState.self.name, token: this.posState.self.token });
 
-          this.quickJoin();
+          this.quickJoin(this.posState.self.token);
         },
         getDesk: function (deskId) {
           for (var i = 0, len = this.desks.length; i < len; i++) {
@@ -681,29 +692,31 @@
           };
           return mapping[this.posId][posId];
         },
-        updatePosStatus: function (posId, state, name) {
+        updatePosStatus: function (posId, state, name, token) {
           var direct = this.getDirectionByPosId(posId);
           this.posState[direct].state = state;
           if (name) {
             this.posState[direct].name = name;
           }
+          this.posState[direct].token = token;
           this.posState[direct].isDizhu = false;
           this.startTimer(false);
-
         },
         sitDown: function (deskId, pos) {
           if (pos.state === 0) {
             layer.load({ type: 3 });
-            this.client.emit('SITDOWN', { deskId: deskId, posId: pos.posId });
-
+            this.client.emit('SITDOWN', { deskId: deskId, posId: pos.posId, token: pos.token });
           }
         },
         exitRoom: function () {
           this.client.emit('UNSITDOWN');
           layer.load({ type: 3 });
 
+          const query = new URLSearchParams(window.location.search);
+          const callbackUrl = query.get('callbackUrl');
+          console.log("通知上层html关闭此iframe " + callbackUrl);
           // 通知上层html关闭此iframe
-          parent.postMessage('exitRoom', "http://localhost:7456");
+          parent.postMessage('exitRoom', callbackUrl);
         },
         resetRoomStatus: function () {
           this.where = 1;
@@ -788,6 +801,7 @@
         },
 
         sendMessage: function (e) {
+          console.log(this.posState);
           var el = e ? e.target : this.$refs.msgInput;
           var msg = el.value;
           el.value = '';
@@ -795,9 +809,9 @@
             this.client.emit('USER_MESSAGE', msg);
           }
         },
-        quickJoin: function () {
+        quickJoin: function (token) {
           layer.load({ type: 3 });
-          this.client.emit('QUICK_JOIN');
+          this.client.emit('QUICK_JOIN', { token });
         }
       }
     })

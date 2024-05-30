@@ -6,6 +6,7 @@ app.use(express.static(`${__dirname}/static`));
 app.get('/', function (req, res) {
   res.sendFile(`${__dirname}/index.html`);
 });
+const { log } = require('console');
 const Game = require('./game.js');
 function createDeskList(n) {
   n = n || 50;
@@ -15,13 +16,14 @@ function createDeskList(n) {
       deskId: i,
       state: 0,
       positions: []
-    }
+    };
     for (let j = 0; j < 3; j++) {
       desk.positions.push({
         posId: j,
         state: 0,
-        userName: ''
-      })
+        userName: '',
+        token: ''
+      });
     }
     ret.push(desk);
   }
@@ -37,14 +39,14 @@ var guid = function () {
   var n = 0;
   return function () {
     return ++n;
-  }
+  };
 }();
 
 
 function GameServer(port) {
   this.clients = [];
   this.port = port;
-  this.desks = createDeskList(20);
+  this.desks = createDeskList(40);
   this.gameDatas = {};
 }
 const proto = {
@@ -58,7 +60,6 @@ const proto = {
   },
   broadCastRoom(event, deskId, data, socket) {
     socket = socket === undefined ? null : socket;
-
     this.clients.forEach((client, index) => {
       if (client.deskId === deskId && client.socket !== socket) {
         client.socket.emit(event, data);
@@ -80,7 +81,7 @@ const proto = {
       let positions = desk.positions;
       return positions.filter(function (pos) {
         return pos.posId !== posId;
-      })
+      });
     }
     return [];
   },
@@ -113,7 +114,7 @@ const proto = {
     const position = this.getPosition(desk, posId);
     return position && position.state === 0;
   },
-  updatePosStatus(deskId, posId, state, userName) {
+  updatePosStatus(deskId, posId, state, userName, token) {
     const desk = this.getDesk(deskId);
     if (desk) {
       const position = this.getPosition(desk, posId);
@@ -122,6 +123,7 @@ const proto = {
         if (userName === '' || userName) {
           position.userName = userName;
         }
+        position.token = token;
       }
     }
   },
@@ -142,7 +144,7 @@ const proto = {
     }
   },
   addClient(socket, data) {
-    this.clients.push({ userName: data.userName, socket: socket, deskId: '', posId: '' });
+    this.clients.push({ userName: data.userName, token: data.token, socket: socket, deskId: '', posId: '' });
   },
   getClient(socket) {
     for (let i = 0, len = this.clients.length; i < len; i++) {
@@ -154,7 +156,7 @@ const proto = {
     return null;
   },
   updateClientState(socket, deskId, posId) {
-    let client = this.getClient(socket)
+    let client = this.getClient(socket);
     if (client) {
       client.deskId = deskId !== undefined ? deskId : '';
       client.posId = posId !== undefined ? posId : '';
@@ -202,9 +204,9 @@ const proto = {
   init() {
     io.on('connection', socket => {
       console.log('有客户端接入，时间： %s', time());
-      socket.on('LOGIN', userName => {
-        if (this.checkUserName(userName)) {
-          this.addClient(socket, { userName });
+      socket.on('LOGIN', data => {
+        if (this.checkUserName(data.userName)) {
+          this.addClient(socket, data);
           socket.emit('LOGIN_SUCCESS', this.desks);
           console.log('有客户端登录，时间： %s', time());
         } else {
@@ -213,7 +215,7 @@ const proto = {
       });
 
       //快速加入
-      socket.on('QUICK_JOIN', () => {
+      socket.on('QUICK_JOIN', (res) => {
         var ret = [];
         this.desks.forEach(desk => {
           let n = 0;
@@ -226,7 +228,7 @@ const proto = {
             if (pos.state > 0) {
               n++;
             } else {
-              item.positions.push(pos.posId)
+              item.positions.push(pos.posId);
             }
           });
           if (n <= 2) {
@@ -237,9 +239,8 @@ const proto = {
           return a.positions.length - b.positions.length;
         });
         const matched = ret.length ? ret[0] : false;
-        const data = matched ? { deskId: matched.deskId, posId: matched.positions[0], success: true } : { success: false }
-        socket.emit('QUICK_JOIN', data)
-
+        const data = matched ? { deskId: matched.deskId, posId: matched.positions[0], token: res.token, success: true } : { success: false };
+        socket.emit('QUICK_JOIN', data);
       });
 
       socket.on('SITDOWN', data => {
@@ -247,12 +248,12 @@ const proto = {
         if (!client) {
           return;
         }
-        const { deskId, posId } = data;
+        const { deskId, posId, token } = data;
         //检查该座位是否是空闲状态
         if (this.isEmptyPos(deskId, posId)) {
           console.log('有客户端进入房间，桌号：%s，座位：%s，时间： %s', deskId, posId, time());
           //更新座位状态为占用
-          this.updatePosStatus(deskId, posId, 1, this.getUserName(socket));
+          this.updatePosStatus(deskId, posId, 1, this.getUserName(socket), token);
           //绑定客户端桌号，座位号
           this.updateClientState(socket, deskId, posId);
           //获取除当前房间其它座位信息
@@ -263,7 +264,7 @@ const proto = {
           this.broadCastHouse('STATUS_CHANGE', { deskId, posId, state: 1 });
 
           //通知在房间里的其它客户端，更新座位息
-          this.broadCastRoom("POS_STATUS_CHANGE", deskId, { posId, state: 1, userName: this.getUserName(socket) }, socket);
+          this.broadCastRoom("POS_STATUS_CHANGE", deskId, { posId, state: 1, userName: this.getUserName(socket), token }, socket);
 
           //推送一条无关紧要的消息
           socket.emit('USER_MESSAGE', { type: 'SYS', posId, msg: '欢迎您加入本房间，祝您游戏愉快！', id: guid(), time: time() });
@@ -324,7 +325,7 @@ const proto = {
 
 
         //推送一条无关紧要的消息
-        this.broadCastRoom('USER_MESSAGE', deskId, { type: 'SYS', posId, msg: `玩家[${this.getUserName(socket)}]退出房间`, id: guid(), time: time() })
+        this.broadCastRoom('USER_MESSAGE', deskId, { type: 'SYS', posId, msg: `玩家[${this.getUserName(socket)}]退出房间`, id: guid(), time: time() });
       });
 
       socket.on('PREPARE', data => {
@@ -387,13 +388,13 @@ const proto = {
             posId: dizhuPosId,
             timeout: 30,
             isPass: false,
-          })
+          });
         }
         if (status == 4) {
           this.broadCastRoom('MESSAGE', deskId, { msg: '没有玩家叫分，重新发牌' });
           this.startGame(deskId);
           //推送一条无关紧要的消息
-          this.broadCastRoom('USER_MESSAGE', deskId, { type: 'SYS', posId, msg: '本局游戏无人叫分，重新发牌', id: guid(), time: time() })
+          this.broadCastRoom('USER_MESSAGE', deskId, { type: 'SYS', posId, msg: '本局游戏无人叫分，重新发牌', id: guid(), time: time() });
 
         }
       });
@@ -423,21 +424,21 @@ const proto = {
               posId: game.getContextPosId(),
               timeout: 15,
               isPass
-            })
-            socket.emit('PLAY_CARD_SUCCESS', data)
+            });
+            socket.emit('PLAY_CARD_SUCCESS', data);
             if (game.getStatus() === 3) {
-              this.broadCastRoom('GAME_OVER', deskId, game.getResult())
-              this.updatePosStatus(deskId, 0, 1)
-              this.updatePosStatus(deskId, 1, 1)
-              this.updatePosStatus(deskId, 2, 1)
+              this.broadCastRoom('GAME_OVER', deskId, game.getResult());
+              this.updatePosStatus(deskId, 0, 1);
+              this.updatePosStatus(deskId, 1, 1);
+              this.updatePosStatus(deskId, 2, 1);
               game.init();
             }
 
             if (game.getStatus() === 5) {
-              socket.emit('PLAY_CARD_ERROR', '游戏出错')
+              socket.emit('PLAY_CARD_ERROR', '游戏出错');
             }
           } else {
-            socket.emit('PLAY_CARD_ERROR', data)
+            socket.emit('PLAY_CARD_ERROR', data);
           }
         }
       });
@@ -484,12 +485,12 @@ const proto = {
             }
           }
           //推送一条无关紧要的消息
-          this.broadCastRoom('USER_MESSAGE', deskId, { type: 'SYS', posId, msg: `玩家[${userName}]退出房间`, id: guid(), time: time() })
+          this.broadCastRoom('USER_MESSAGE', deskId, { type: 'SYS', posId, msg: `玩家[${userName}]退出房间`, id: guid(), time: time() });
           console.log('有客户端退出房间，桌号：%s，座位：%s，时间：', deskId, posId, time());
         }
 
         console.log('有客户端断开了连接 %s', time());
-      })
+      });
 
       socket.on('USER_MESSAGE', msg => {
         const client = this.getClient(socket);
@@ -500,8 +501,8 @@ const proto = {
         if (!deskId) {
           return;
         }
-        this.broadCastRoom('USER_MESSAGE', deskId, { type: 'USER', posId, msg, time: time(), id: guid() })
-      })
+        this.broadCastRoom('USER_MESSAGE', deskId, { type: 'USER', posId, msg, time: time(), id: guid() });
+      });
 
 
     });
@@ -512,7 +513,7 @@ const proto = {
       (require('os').platform() == 'win32') && require('child_process').exec(`start http://localhost:${this.port}/index.html`);
     });
   }
-}
+};
 Object.assign(GameServer.prototype, proto);
 const gameServer = new GameServer(8001);
 gameServer.init();
