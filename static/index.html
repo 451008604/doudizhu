@@ -507,22 +507,27 @@
 
 
             if (data.winner.indexOf(this.posId) > - 1) {
-              // 胜利后上报战绩
-              var postMyData = {
-                "customer_id": "" + this.posState.self.token,
-                "chess_card": "puke_dou_di_zhu",
-                "duration_time": "" + (Math.floor(new Date().getTime() / 1000) - this.durationTime),
-                "rival_customer_ids": "",
-                "partner_customer_ids": "",
-                "current_score": 1,
-                "game_result": "victory",
-                "other_attr": {},
-                "game_count": "2"
-              };
+              var data = "?customer_id=" + this.posState.self.token + "&chess_card=puke_dou_di_zhu&duration_time=" + (Math.floor(new Date().getTime() / 1000) - this.durationTime) + "&current_score=1&game_result=victory&game_count=2";
               let xhr = new XMLHttpRequest();
-              xhr.open("POST", "https://bpbsn.ycan.cn/api/v1/weixin/saveChessCardResult", true);
-              xhr.setRequestHeader('Conten-Type', 'application/json');
-              xhr.send(JSON.stringify(postMyData));
+              xhr.open("GET", "https://bpbsn.ycan.cn/api/v1/weixin/saveChessCardResult" + data, false);
+              xhr.send();
+
+              // 胜利后上报战绩
+              // var postMyData = {
+              //   "customer_id": "" + this.posState.self.token,
+              //   "chess_card": "puke_dou_di_zhu",
+              //   "duration_time": "" + (Math.floor(new Date().getTime() / 1000) - this.durationTime),
+              //   "rival_customer_ids": "",
+              //   "partner_customer_ids": "",
+              //   "current_score": 1,
+              //   "game_result": "victory",
+              //   "other_attr": {},
+              //   "game_count": "2"
+              // };
+              // let xhr = new XMLHttpRequest();
+              // xhr.open("POST", "https://bpbsn.ycan.cn/api/v1/weixin/saveChessCardResult", true);
+              // xhr.setRequestHeader('Conten-Type', 'application/json');
+              // xhr.send(JSON.stringify(postMyData));
             }
 
           }.bind(this));
