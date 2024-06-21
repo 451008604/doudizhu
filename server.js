@@ -22,7 +22,8 @@ function createDeskList(n) {
         posId: j,
         state: 0,
         userName: '',
-        token: ''
+        token: '',
+        avatar: ''
       });
     }
     ret.push(desk);
@@ -114,7 +115,7 @@ const proto = {
     const position = this.getPosition(desk, posId);
     return position && position.state === 0;
   },
-  updatePosStatus(deskId, posId, state, userName, token) {
+  updatePosStatus(deskId, posId, state, userName, token, avatar) {
     const desk = this.getDesk(deskId);
     if (desk) {
       const position = this.getPosition(desk, posId);
@@ -124,6 +125,7 @@ const proto = {
           position.userName = userName;
         }
         position.token = token;
+        position.avatar = avatar;
       }
     }
   },
@@ -144,7 +146,7 @@ const proto = {
     }
   },
   addClient(socket, data) {
-    this.clients.push({ userName: data.userName, token: data.token, socket: socket, deskId: '', posId: '' });
+    this.clients.push({ userName: data.userName, token: data.token, avatar: data.avatar, socket: socket, deskId: '', posId: '' });
   },
   getClient(socket) {
     for (let i = 0, len = this.clients.length; i < len; i++) {
@@ -239,7 +241,7 @@ const proto = {
           return a.positions.length - b.positions.length;
         });
         const matched = ret.length ? ret[0] : false;
-        const data = matched ? { deskId: matched.deskId, posId: matched.positions[0], token: res.token, success: true } : { success: false };
+        const data = matched ? { deskId: matched.deskId, posId: matched.positions[0], token: res.token, avatar: res.avatar, success: true } : { success: false };
         socket.emit('QUICK_JOIN', data);
       });
 
@@ -248,12 +250,12 @@ const proto = {
         if (!client) {
           return;
         }
-        const { deskId, posId, token } = data;
+        const { deskId, posId, token, avatar } = data;
         //检查该座位是否是空闲状态
         if (this.isEmptyPos(deskId, posId)) {
           console.log('有客户端进入房间，桌号：%s，座位：%s，时间： %s', deskId, posId, time());
           //更新座位状态为占用
-          this.updatePosStatus(deskId, posId, 1, this.getUserName(socket), token);
+          this.updatePosStatus(deskId, posId, 1, this.getUserName(socket), token, avatar);
           //绑定客户端桌号，座位号
           this.updateClientState(socket, deskId, posId);
           //获取除当前房间其它座位信息
@@ -264,7 +266,7 @@ const proto = {
           this.broadCastHouse('STATUS_CHANGE', { deskId, posId, state: 1 });
 
           //通知在房间里的其它客户端，更新座位息
-          this.broadCastRoom("POS_STATUS_CHANGE", deskId, { posId, state: 1, userName: this.getUserName(socket), token }, socket);
+          this.broadCastRoom("POS_STATUS_CHANGE", deskId, { posId, state: 1, userName: this.getUserName(socket), token, avatar }, socket);
 
           //推送一条无关紧要的消息
           socket.emit('USER_MESSAGE', { type: 'SYS', posId, msg: '欢迎您加入本房间，祝您游戏愉快！', id: guid(), time: time() });

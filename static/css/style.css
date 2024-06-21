@@ -542,6 +542,7 @@
      height: 80px;
      background-image: url('../images/qq.png');
      background-repeat: no-repeat;
+     background-size: contain;
      background-position: bottom;
      margin-bottom: 5px;
  }

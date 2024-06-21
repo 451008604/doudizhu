@@ -65,7 +65,7 @@
           </div>
           <!-- 自己的头像 -->
           <div class="player-wrapper player-self-ctx">
-            <div class="player-photo" :class="{'player-photo-king':posState.self.isDizhu}"></div>
+            <div class="player-photo player-photo-self" :class="{'player-photo-king':posState.self.isDizhu}"></div>
             <div class="player-name text-center">{{posState.self.name}}</div>
             <div class="text-center player-status" v-if="posState.self.state === 2 && (roomState.state === 0 || roomState.state === 3)">准备</div>
             <!-- <div class="text-center" v-if="posState.self.isDizhu">
@@ -287,12 +287,17 @@
         };
       },
       watch: {
+        'posState.left.avatar': function (newVal, oldVal) {
+          console.log("posState.left.avatar", newVal, oldVal);
+          $(".player-photo-left").attr("style", "background-image:url('" + (newVal ? newVal : "../images/qq-king.png") + "')");
+        },
+        'posState.right.avatar': function (newVal, oldVal) {
+          console.log("posState.right.avatar", newVal, oldVal);
+          $(".player-photo-right").attr("style", "background-image:url('" + (newVal ? newVal : "../images/qq-king.png") + "')");
+        },
         'posState.self.avatar': function (newVal, oldVal) {
-          // player-photo-left
-          // player-photo-right
-          // player-photo-self
-          console.log(newVal, oldVal, (newVal ? newVal : "url('../images/qq-king.png')"));
-          $(".player-photo-self").attr("style", "background-image:url('" + (newVal ? newVal : "../images/qq-king.png") + "')")
+          console.log("posState.self.avatar", newVal, oldVal);
+          $(".player-photo-self").attr("style", "background-image:url('" + (newVal ? newVal : "../images/qq-king.png") + "')");
         }
       },
       mounted: function () {
@@ -324,7 +329,7 @@
 
           this.client.on('QUICK_JOIN', function (data) {
             if (data.success) {
-              this.client.emit('SITDOWN', { deskId: data.deskId, posId: data.posId, token: data.token });
+              this.client.emit('SITDOWN', { deskId: data.deskId, posId: data.posId, token: data.token, avatar: data.avatar });
             } else {
               layer.closeAll();
               layer.msg('快速加入失败');
@@ -337,7 +342,7 @@
             this.posId = data.posId;
             this.deskId = data.deskId;
             data.posInfos.forEach(function (pos) {
-              this.updatePosStatus(pos.posId, pos.state, pos.userName, pos.token);
+              this.updatePosStatus(pos.posId, pos.state, pos.userName, pos.token, pos.avatar);
             }.bind(this));
             this.posState.self.isDizhu = false;
             //this.msgList = [];
@@ -367,13 +372,14 @@
           }.bind(this));
 
           this.client.on('POS_STATUS_CHANGE', function (data) {
+            console.log(data);
             var direct = this.getDirectionByPosId(data.posId);
-            this.updatePosStatus(data.posId, data.state, data.userName);
+            this.updatePosStatus(data.posId, data.state, data.userName, data.token, data.avatar);
           }.bind(this));
 
           this.client.on('POS_STATUS_RESET', function (data) {
             data.pos.forEach(function (pos) {
-              this.updatePosStatus(pos.posId, data.state);
+              this.updatePosStatus(pos.posId, data.state, data.userName, data.token, data.avatar);
             }.bind(this));
           }.bind(this));
 
@@ -594,9 +600,9 @@
             return layer.msg('名字不超过50个字');
           }
           layer.load({ type: 3 });
-          this.client.emit('LOGIN', { userName: this.posState.self.name, token: this.posState.self.token });
+          this.client.emit('LOGIN', { userName: this.posState.self.name, token: this.posState.self.token, avatar: this.posState.self.avatar });
 
-          this.quickJoin(this.posState.self.token);
+          this.quickJoin(this.posState.self.token, this.posState.self.avatar);
         },
         getDesk: function (deskId) {
           for (var i = 0, len = this.desks.length; i < len; i++) {
@@ -700,13 +706,14 @@
           };
           return mapping[this.posId][posId];
         },
-        updatePosStatus: function (posId, state, name, token) {
+        updatePosStatus: function (posId, state, name, token, avatar) {
           var direct = this.getDirectionByPosId(posId);
           this.posState[direct].state = state;
           if (name) {
             this.posState[direct].name = name;
           }
           this.posState[direct].token = token;
+          this.posState[direct].avatar = avatar;
           this.posState[direct].isDizhu = false;
           this.startTimer(false);
         },
@@ -817,9 +824,9 @@
             this.client.emit('USER_MESSAGE', msg);
           }
         },
-        quickJoin: function (token) {
+        quickJoin: function (token, avatar) {
           layer.load({ type: 3 });
-          this.client.emit('QUICK_JOIN', { token });
+          this.client.emit('QUICK_JOIN', { token, avatar });
         }
       }
     })
