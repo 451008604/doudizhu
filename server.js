@@ -335,16 +335,16 @@ const proto = {
         if (!client) {
           return;
         }
-        const { deskId, posId } = client;
+        const { deskId, posId, userName, token, avatar } = client;
         if (!deskId) {
           return;
         }
         //更新座位为准备状态
-        this.updatePosStatus(deskId, posId, 2);
+        this.updatePosStatus(deskId, posId, 2, userName, token, avatar);
         //通知该客户端准备成功
         socket.emit('PREPARE_SUCCESS');
         //通知房间里的其它客户端更新座位信息
-        this.broadCastRoom("POS_STATUS_CHANGE", deskId, { posId, state: 2 }, socket);
+        this.broadCastRoom("POS_STATUS_CHANGE", deskId, { posId, state: 2, userName, token, avatar }, socket);
 
         //更新房间状态
         this.updateRoomStatus(deskId, 1);
